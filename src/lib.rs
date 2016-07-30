@@ -165,6 +165,8 @@ fn identify_packet_data_by_magic(pck_data :&[u8]) -> Option<(usize, BareOggForma
 
 		_ => return None,
 	};
+
+	return Some(ret);
 }
 
 /// Reads the format of the file.
