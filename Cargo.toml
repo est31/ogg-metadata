@@ -2,7 +2,7 @@
 name = "ogg_metadata"
 version = "0.1.0"
 authors = ["est31 <MTest31@outlook.com>"]
-description = "Metadata parser for various Ogg files"
+description = "Metadata parser for various Ogg codecs"
 license = "MIT/Apache-2.0"
 keywords = ["ogg", "vorbis", "opus", "theora", "speex"]
 repository = "https://github.com/est31/ogg-metadata"
