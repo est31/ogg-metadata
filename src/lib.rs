@@ -41,6 +41,7 @@ mod vorbis;
 
 use std::io;
 use ogg::{OggReadError, PacketReader};
+use std::time::Duration;
 
 pub use vorbis::Metadata as VorbisMetadata;
 
@@ -55,6 +56,11 @@ pub enum OggFormat {
 	Theora,
 	/// The speex format ([spec](http://www.speex.org/docs/manual/speex-manual/)).
 	Speex,
+}
+
+pub trait AudioMetadata {
+	fn get_output_channel_count(&self) -> u8;
+	fn get_duration(&self) -> Duration;
 }
 
 #[derive(Debug)]
