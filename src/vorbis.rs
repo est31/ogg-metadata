@@ -38,9 +38,11 @@ impl fmt::Debug for Metadata {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		let duration_raw_secs = (self.length_in_samples as f64) / (self.sample_rate as f64);
 		let duration_mins = f64::floor(duration_raw_secs / 60.);
-		let duration_secs = duration_raw_secs % 60.;
-		write!(f, "{} channels, with {} Hz sample rate and duration of {:02}:{:02.0} secs",
-			self.channels, self.sample_rate, duration_mins, duration_secs)
+		let duration_secs = f64::floor(duration_raw_secs % 60.);
+		let duration_secs_fractal = (duration_raw_secs % 1.) * 100.;
+		write!(f, "{} channels, with {} Hz sample rate and duration of {:02}:{:02}.{:02.0}",
+			self.channels, self.sample_rate,
+				duration_mins, duration_secs, duration_secs_fractal)
 	}
 }
 
