@@ -38,12 +38,14 @@ macro_rules! try {
 // */
 
 mod vorbis;
+mod opus;
 
 use std::io;
 use ogg::{OggReadError, PacketReader};
 use std::time::Duration;
 
 pub use vorbis::Metadata as VorbisMetadata;
+pub use opus::Metadata as OpusMetadata;
 
 #[derive(Debug)]
 pub enum OggFormat {
@@ -51,7 +53,7 @@ pub enum OggFormat {
 	Vorbis(VorbisMetadata),
 	/// The opus format, as specified by [RFC 6716](https://tools.ietf.org/html/rfc6716),
 	/// and [RFC 7845](https://tools.ietf.org/html/rfc7845).
-	Opus,
+	Opus(OpusMetadata),
 	/// The Theora video format ([spec](https://www.theora.org/doc/Theora.pdf)).
 	Theora,
 	/// The speex format ([spec](http://www.speex.org/docs/manual/speex-manual/)).
@@ -159,7 +161,15 @@ pub fn read_format<'a, T :io::Read + io::Seek + 'a>(rdr :&mut T)
 				length_in_samples : len,
 			})
 		},
-		0x4f if pck.data.starts_with(opus_magic) => Opus,
+		0x4f if pck.data.starts_with(opus_magic) => {
+			let ident_hdr = try!(opus::read_header_ident(
+				&pck.data[opus_magic.len()..]));
+			let len = try!(get_absgp_of_last_packet(&mut pck_rdr));
+			Opus(OpusMetadata {
+				output_channels : ident_hdr.output_channels,
+				length_in_48khz_samples : len - (ident_hdr.pre_skip as u64),
+			})
+		},
 		0x80 if pck.data.starts_with(theora_magic) => Theora,
 		0x53 if pck.data.starts_with(speex_magic) => Speex,
 
