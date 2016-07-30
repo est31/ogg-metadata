@@ -25,6 +25,8 @@ Support will be extended in the future, especially for the theora and Opus codec
 extern crate byteorder;
 extern crate ogg;
 
+// Comment this out if you want stack traces for your errors, useful for debugging.
+/*
 macro_rules! try {
 	($expr:expr) => (match $expr {
 		$crate::std::result::Result::Ok(val) => val,
@@ -33,6 +35,7 @@ macro_rules! try {
 		}
 	})
 }
+// */
 
 mod vorbis;
 
