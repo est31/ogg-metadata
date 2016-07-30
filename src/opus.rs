@@ -18,6 +18,11 @@ Metadata for the Opus audio codec.
 */
 pub struct Metadata {
 	pub output_channels :u8,
+	/// The number of samples in this piece
+	///
+	/// While opus has a varying sample rate,
+	/// the per-page sample counter operates on
+	/// units of 48khz.
 	pub length_in_48khz_samples :u64,
 }
 

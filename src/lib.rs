@@ -15,11 +15,11 @@ Metadata parser library for various Ogg formats.
 Supported formats:
 
 * Vorbis (Detect, Metadata)
-* Opus (Detect)
+* Opus (Detect, Metadata)
 * Theora (Detect)
 * Speex (Detect)
 
-Support will be extended in the future, especially for the theora and Opus codecs.
+Support will be extended in the future, especially for the Theora codec.
 */
 
 extern crate byteorder;
