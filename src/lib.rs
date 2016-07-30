@@ -60,6 +60,15 @@ pub enum OggFormat {
 	Speex,
 }
 
+/// Bare (C-style enum) counterpart to OggFormat
+pub enum BareOggFormat {
+	Vorbis,
+	Opus,
+	Theora,
+	Speex,
+	Skeleton,
+}
+
 pub trait AudioMetadata {
 	fn get_output_channel_count(&self) -> u8;
 	fn get_duration(&self) -> Duration;
@@ -129,11 +138,7 @@ fn get_absgp_of_last_packet<'a, T :io::Read + io::Seek + 'a>(pck_rdr :&mut Packe
 	return Ok(pck.absgp_page);
 }
 
-/// Reads the format of the file.
-pub fn read_format<'a, T :io::Read + io::Seek + 'a>(rdr :&mut T)
-		-> Result<OggFormat, OggMetadataError> {
-	let mut pck_rdr = PacketReader::new(rdr);
-	let pck = try!(pck_rdr.read_packet());
+fn identify_packet_data_by_magic(pck_data :&[u8]) -> Option<(usize, BareOggFormat)> {
 	// Magic sequences.
 	// https://www.xiph.org/vorbis/doc/Vorbis_I_spec.html#x1-620004.2.1
 	let vorbis_magic = &[0x01, 0x76, 0x6f, 0x72, 0x62, 0x69, 0x73];
@@ -143,17 +148,43 @@ pub fn read_format<'a, T :io::Read + io::Seek + 'a>(rdr :&mut T)
 	let theora_magic = &[0x80, 0x74, 0x68, 0x65, 0x6f, 0x72, 0x61];
 	// http://www.speex.org/docs/manual/speex-manual/node8.html
 	let speex_magic = &[0x53, 0x70, 0x65, 0x65, 0x78, 0x20, 0x20, 0x20];
+	// https://wiki.xiph.org/Ogg_Skeleton_4#Ogg_Skeleton_version_4.0_Format_Specification
+	let skeleton_magic = &[0x66, 105, 115, 104, 101, 97, 100, 0];
+
+	use BareOggFormat::*;
+	let ret :(usize, BareOggFormat) = match pck_data[0] {
+		0x01 if pck_data.starts_with(vorbis_magic) => (vorbis_magic.len(), Vorbis),
+		0x4f if pck_data.starts_with(opus_magic) => (opus_magic.len(), Opus),
+		0x80 if pck_data.starts_with(theora_magic) => (theora_magic.len(), Theora),
+		0x53 if pck_data.starts_with(speex_magic) => (speex_magic.len(), Speex),
+		0x66 if pck_data.starts_with(skeleton_magic) => (speex_magic.len(), Skeleton),
+
+		_ => return None,
+	};
+}
+
+/// Reads the format of the file.
+pub fn read_format<'a, T :io::Read + io::Seek + 'a>(rdr :&mut T)
+		-> Result<OggFormat, OggMetadataError> {
+	let mut pck_rdr = PacketReader::new(rdr);
+	let pck = try!(pck_rdr.read_packet());
+
+	// TODO get skeletons working.
 
 	if pck.data.len() < 1 {
 		// TODO not a recognized format
 		try!(Err(OggMetadataError::UnrecognizedFormat));
 	}
 
+	let id = identify_packet_data_by_magic(&pck.data);
+	let id_inner = match id { Some(v) => v, None =>
+		try!(Err(OggMetadataError::UnrecognizedFormat)) };
+
 	use OggFormat::*;
-	let ret :OggFormat = match pck.data[0] {
-		0x01 if pck.data.starts_with(vorbis_magic) => {
+	let ret :OggFormat = match id_inner.1 {
+		BareOggFormat::Vorbis => {
 			let ident_hdr = try!(vorbis::read_header_ident(
-				&pck.data[vorbis_magic.len()..]));
+				&pck.data[id_inner.0..]));
 			let len = try!(get_absgp_of_last_packet(&mut pck_rdr));
 			Vorbis(VorbisMetadata {
 				channels : ident_hdr.channels,
@@ -161,17 +192,17 @@ pub fn read_format<'a, T :io::Read + io::Seek + 'a>(rdr :&mut T)
 				length_in_samples : len,
 			})
 		},
-		0x4f if pck.data.starts_with(opus_magic) => {
+		BareOggFormat::Opus => {
 			let ident_hdr = try!(opus::read_header_ident(
-				&pck.data[opus_magic.len()..]));
+				&pck.data[id_inner.0..]));
 			let len = try!(get_absgp_of_last_packet(&mut pck_rdr));
 			Opus(OpusMetadata {
 				output_channels : ident_hdr.output_channels,
 				length_in_48khz_samples : len - (ident_hdr.pre_skip as u64),
 			})
 		},
-		0x80 if pck.data.starts_with(theora_magic) => Theora,
-		0x53 if pck.data.starts_with(speex_magic) => Speex,
+		BareOggFormat::Theora => Theora,
+		BareOggFormat::Speex => Speex,
 
 		_ => try!(Err(OggMetadataError::UnrecognizedFormat)),
 	};
