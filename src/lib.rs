@@ -66,7 +66,7 @@ pub enum OggFormat {
 }
 
 /// Bare (C-style enum) counterpart to OggFormat
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 enum BareOggFormat {
 	Vorbis,
 	Opus,
@@ -180,6 +180,48 @@ fn identify_packet_data_by_magic(pck_data :&[u8]) -> Option<(usize, BareOggForma
 	return Some(ret);
 }
 
+fn needs_last_packet_absgp(bare_format :BareOggFormat) -> bool {
+	match bare_format {
+		BareOggFormat::Vorbis => true,
+		BareOggFormat::Opus => true,
+		BareOggFormat::Theora => false,
+		BareOggFormat::Speex => false,
+		BareOggFormat::Skeleton => false,
+	}
+}
+
+fn get_format(pck_data :&[u8], bare_format :BareOggFormat,
+		last_packet_absgp :Option<u64>) -> Result<OggFormat, OggMetadataError> {
+	use OggFormat::*;
+	Ok(match bare_format {
+		BareOggFormat::Vorbis => {
+			let ident_hdr = try!(vorbis::read_header_ident(pck_data));
+			Vorbis(VorbisMetadata {
+				channels : ident_hdr.channels,
+				sample_rate : ident_hdr.sample_rate,
+				length_in_samples : last_packet_absgp.unwrap(),
+			})
+		},
+		BareOggFormat::Opus => {
+			let ident_hdr = try!(opus::read_header_ident(pck_data));
+			let len = last_packet_absgp.unwrap();
+			Opus(OpusMetadata {
+				output_channels : ident_hdr.output_channels,
+				length_in_48khz_samples : len - (ident_hdr.pre_skip as u64),
+			})
+		},
+		BareOggFormat::Theora => {
+			let ident_hdr = try!(theora::read_header_ident(pck_data));
+			Theora(TheoraMetadata {
+				pixels_width : ident_hdr.picture_region_width,
+				pixels_height : ident_hdr.picture_region_height,
+			})
+		},
+		BareOggFormat::Speex => Speex,
+		BareOggFormat::Skeleton => Skeleton,
+	})
+}
+
 /// Reads the format of the file.
 ///
 /// The read process is optimized for detecting the format without
@@ -205,143 +247,93 @@ pub fn read_format<'a, T :io::Read + io::Seek + 'a>(rdr :&mut T)
 	let id_inner = match id { Some(v) => v, None =>
 		try!(Err(OggMetadataError::UnrecognizedFormat)) };
 
-	use OggFormat::*;
-
 	let mut res = Vec::new();
 
-	match id_inner.1 {
-		BareOggFormat::Vorbis => {
-			let ident_hdr = try!(vorbis::read_header_ident(
-				&pck.data[id_inner.0..]));
-			let len = try!(get_absgp_of_last_packet(&mut pck_rdr));
-			res.push(Vorbis(VorbisMetadata {
-				channels : ident_hdr.channels,
-				sample_rate : ident_hdr.sample_rate,
-				length_in_samples : len,
-			}));
-		},
-		BareOggFormat::Opus => {
-			let ident_hdr = try!(opus::read_header_ident(
-				&pck.data[id_inner.0..]));
-			let len = try!(get_absgp_of_last_packet(&mut pck_rdr));
-			res.push(Opus(OpusMetadata {
-				output_channels : ident_hdr.output_channels,
-				length_in_48khz_samples : len - (ident_hdr.pre_skip as u64),
-			}));
-		},
-		BareOggFormat::Theora => {
-			let ident_hdr = try!(theora::read_header_ident(
-				&pck.data[id_inner.0..]));
-				res.push(Theora(TheoraMetadata {
-					pixels_width : ident_hdr.picture_region_width,
-					pixels_height : ident_hdr.picture_region_height,
-				}));
-		},
-		BareOggFormat::Speex => res.push(Speex),
-		BareOggFormat::Skeleton => {
-			use std::collections::HashMap;
+	let simple_seek_to_end_is_needed = needs_last_packet_absgp(id_inner.1);
 
-			res.push(Skeleton);
-
-			// Loop until the skeleton stream ended
-			// and record any opening streams.
-			let mut streams = HashMap::new();
-			loop {
-				let pck_cur = try!(pck_rdr.read_packet());
-
-				if pck_cur.stream_serial == pck.stream_serial {
-					/*
-					// "fisbone\0"
-					let fisbone_magic = [0x66, 0x69, 0x73, 0x62, 0x6f, 0x6e, 0x65, 0x00];
-					// "index\0"
-					let index_magic = [0x69, 0x6e, 0x64, 0x65, 0x78, 0x00];
-					match () {
-						() if pck_cur.data.starts_with(&fisbone_magic) => {
-							println!("==> bone!");
-						},
-						() if pck_cur.data.starts_with(&index_magic) => {
-							println!("==> index!");
-						},
-						_ => {},
-					}
-					*/
-					if pck_cur.last_packet {
-						break;
-					}
-				}
-
-				if !pck_cur.first_packet {
-					continue;
-				}
-				let id = identify_packet_data_by_magic(&pck_cur.data);
-				let id_inner = match id { Some(v) => v, None => continue };
-				streams.insert(pck_cur.stream_serial, (id_inner, pck_cur));
-			}
-
-			// Now seek to right before the end to get the last packets of the content.
-			// 200 kb are just a guessed number and they might be totally wrong.
-			// Can this guess be improved??
-			try!(seek_before_end(&mut pck_rdr, 200 * 1024));
-
-			// Now Loop until we have found the
-			// last packets of all the streams,
-			// recording the streams in the process.
-			while !streams.is_empty() {
-				// TODO don't use try! here, but something else
-				// so that we are more tolerant if there is no more
-				// packet to come.
-				// Because we will reach the err case of this
-				// try if we didn't seek early enough, and didn't
-				// catch all end pages of the streams to be
-				// still before us.
-				// As this failure would be our fault due to our
-				// seek distance guess, we should fail gracefully
-				// and just pretend the stream does not exist.
-				let pck_cur = try!(pck_rdr.read_packet());
-
-				// We are only interested in last packets.
-				if !pck_cur.last_packet {
-					continue;
-				}
-				let stream = match streams.remove(&pck_cur.stream_serial) {
-					Some(v) => v, None => continue };
-				let st = match (stream.0).1 {
-					BareOggFormat::Vorbis => {
-						let ident_hdr = try!(vorbis::read_header_ident(
-							&(stream.1).data[(stream.0).0..]));
-						let len = pck_cur.absgp_page;
-						Vorbis(VorbisMetadata {
-							channels : ident_hdr.channels,
-							sample_rate : ident_hdr.sample_rate,
-							length_in_samples : len,
-						})
-					},
-					BareOggFormat::Opus => {
-						let ident_hdr = try!(opus::read_header_ident(
-							&(stream.1).data[(stream.0).0..]));
-						let len = pck_cur.absgp_page;
-						Opus(OpusMetadata {
-							output_channels : ident_hdr.output_channels,
-							length_in_48khz_samples : len - (ident_hdr.pre_skip as u64),
-						})
-					},
-					BareOggFormat::Theora => {
-						let ident_hdr = try!(theora::read_header_ident(
-							&(stream.1).data[(stream.0).0..]));
-						Theora(TheoraMetadata {
-							pixels_width : ident_hdr.picture_region_width,
-							pixels_height : ident_hdr.picture_region_height,
-						})
-					},
-					BareOggFormat::Speex => Speex,
-					// This is invalid.
-					BareOggFormat::Skeleton =>
-						try!(Err(OggMetadataError::UnrecognizedFormat)),
-				};
-				res.push(st);
-			}
-		},
+	let last_packet_absgp = if simple_seek_to_end_is_needed {
+		Some(try!(get_absgp_of_last_packet(&mut pck_rdr)))
+	} else {
+		None
 	};
+
+	res.push(try!(get_format(&pck.data[id_inner.0..], id_inner.1, last_packet_absgp)));
+
+	if id_inner.1 == BareOggFormat::Skeleton {
+		use std::collections::HashMap;
+
+		// Loop until the skeleton stream ended
+		// and record any opening streams.
+		let mut streams = HashMap::new();
+		loop {
+			let pck_cur = try!(pck_rdr.read_packet());
+
+			if pck_cur.stream_serial == pck.stream_serial {
+				/*
+				// "fisbone\0"
+				let fisbone_magic = [0x66, 0x69, 0x73, 0x62, 0x6f, 0x6e, 0x65, 0x00];
+				// "index\0"
+				let index_magic = [0x69, 0x6e, 0x64, 0x65, 0x78, 0x00];
+				match () {
+					() if pck_cur.data.starts_with(&fisbone_magic) => {
+						println!("==> bone!");
+					},
+					() if pck_cur.data.starts_with(&index_magic) => {
+						println!("==> index!");
+					},
+					_ => {},
+				}
+				*/
+				if pck_cur.last_packet {
+					break;
+				}
+			}
+
+			if !pck_cur.first_packet {
+				continue;
+			}
+			let id = identify_packet_data_by_magic(&pck_cur.data);
+			let id_inner = match id { Some(v) => v, None => continue };
+			streams.insert(pck_cur.stream_serial, (id_inner, pck_cur));
+		}
+
+		// Now seek to right before the end to get the last packets of the content.
+		// 200 kb are just a guessed number and they might be totally wrong.
+		// Can this guess be improved??
+		try!(seek_before_end(&mut pck_rdr, 200 * 1024));
+
+		// Now Loop until we have found the
+		// last packets of all the streams,
+		// recording the streams in the process.
+		while !streams.is_empty() {
+			// TODO don't use try! here, but something else
+			// so that we are more tolerant if there is no more
+			// packet to come.
+			// Because we will reach the err case of this
+			// try if we didn't seek early enough, and didn't
+			// catch all end pages of the streams to be
+			// still before us.
+			// As this failure would be our fault due to our
+			// seek distance guess, we should fail gracefully
+			// and just pretend the stream does not exist.
+			let pck_cur = try!(pck_rdr.read_packet());
+
+			// We are only interested in last packets.
+			if !pck_cur.last_packet {
+				continue;
+			}
+			let stream = match streams.remove(&pck_cur.stream_serial) {
+				Some(v) => v, None => continue };
+
+			if (stream.0).1 == BareOggFormat::Skeleton {
+				// This is an invalid format.
+				try!(Err(OggMetadataError::UnrecognizedFormat));
+			}
+			let st = try!(get_format(&(stream.1).data[(stream.0).0..],
+				(stream.0).1, Some(pck_cur.absgp_page)));
+			res.push(st);
+		}
+	}
 
 	return Ok(res);
 }
