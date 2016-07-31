@@ -26,7 +26,6 @@ impl AudioMetadata for Metadata {
 	fn get_output_channel_count(&self) -> u8 {
 		self.channels
 	}
-	/// Returns the duration of the vorbis audio piece.
 	fn get_duration(&self) -> Duration {
 		Duration::from_millis(
 				((self.length_in_samples as f64) / (self.sample_rate as f64) * 1000.0)
