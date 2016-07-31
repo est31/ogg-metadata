@@ -10,4 +10,4 @@ readme = "README.md"
 
 [dependencies]
 byteorder = "0.5"
-ogg = "0.2"
+ogg = "0.3"
