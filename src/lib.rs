@@ -64,7 +64,8 @@ pub enum OggFormat {
 }
 
 /// Bare (C-style enum) counterpart to OggFormat
-pub enum BareOggFormat {
+#[derive(Debug)]
+enum BareOggFormat {
 	Vorbis,
 	Opus,
 	Theora,
