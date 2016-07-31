@@ -9,7 +9,6 @@
 use std::io::Cursor;
 use byteorder::{ReadBytesExt, BigEndian};
 use std::fmt;
-use std::time::Duration;
 use OggMetadataError;
 
 /**
