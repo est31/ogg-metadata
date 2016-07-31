@@ -16,7 +16,7 @@ Supported formats:
 
 * Vorbis (Detect, Metadata)
 * Opus (Detect, Metadata)
-* Theora (Detect)
+* Theora (Detect, Metadata)
 * Speex (Detect)
 
 Support will be extended in the future, especially for the Theora codec.
@@ -39,6 +39,7 @@ macro_rules! try {
 
 mod vorbis;
 mod opus;
+mod theora;
 
 use std::io;
 use ogg::{OggReadError, PacketReader};
@@ -46,6 +47,7 @@ use std::time::Duration;
 
 pub use vorbis::Metadata as VorbisMetadata;
 pub use opus::Metadata as OpusMetadata;
+pub use theora::Metadata as TheoraMetadata;
 
 #[derive(Debug)]
 pub enum OggFormat {
@@ -55,7 +57,7 @@ pub enum OggFormat {
 	/// and [RFC 7845](https://tools.ietf.org/html/rfc7845).
 	Opus(OpusMetadata),
 	/// The Theora video format ([spec](https://www.theora.org/doc/Theora.pdf)).
-	Theora,
+	Theora(TheoraMetadata),
 	/// The speex format ([spec](http://www.speex.org/docs/manual/speex-manual/)).
 	Speex,
 	/// The skeleton format with structure information
@@ -227,7 +229,14 @@ pub fn read_format<'a, T :io::Read + io::Seek + 'a>(rdr :&mut T)
 				length_in_48khz_samples : len - (ident_hdr.pre_skip as u64),
 			}));
 		},
-		BareOggFormat::Theora => res.push(Theora),
+		BareOggFormat::Theora => {
+			let ident_hdr = try!(theora::read_header_ident(
+				&pck.data[id_inner.0..]));
+				res.push(Theora(TheoraMetadata {
+					pixels_width : ident_hdr.picture_region_width,
+					pixels_height : ident_hdr.picture_region_height,
+				}));
+		},
 		BareOggFormat::Speex => res.push(Speex),
 		BareOggFormat::Skeleton => {
 			use std::collections::HashMap;
@@ -316,7 +325,14 @@ pub fn read_format<'a, T :io::Read + io::Seek + 'a>(rdr :&mut T)
 							length_in_48khz_samples : len - (ident_hdr.pre_skip as u64),
 						})
 					},
-					BareOggFormat::Theora => Theora,
+					BareOggFormat::Theora => {
+						let ident_hdr = try!(theora::read_header_ident(
+							&(stream.1).data[(stream.0).0..]));
+						Theora(TheoraMetadata {
+							pixels_width : ident_hdr.picture_region_width,
+							pixels_height : ident_hdr.picture_region_height,
+						})
+					},
 					BareOggFormat::Speex => Speex,
 					// This is invalid.
 					BareOggFormat::Skeleton =>

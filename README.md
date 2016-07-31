@@ -6,7 +6,7 @@ Supported formats:
 
 * Vorbis (Detection, Metadata)
 * Opus (Detection, Metadata)
-* Theora (Detection)
+* Theora (Detection, Metadata)
 * Speex (Detection)
 
 ## License
