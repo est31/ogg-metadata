@@ -180,6 +180,8 @@ fn identify_packet_data_by_magic(pck_data :&[u8]) -> Option<(usize, BareOggForma
 	return Some(ret);
 }
 
+/// Returns whether the rich metadata has lenth information,
+/// which requires retrieving of the absgp of the last packet.
 fn needs_last_packet_absgp(bare_format :BareOggFormat) -> bool {
 	match bare_format {
 		BareOggFormat::Vorbis => true,
@@ -190,7 +192,7 @@ fn needs_last_packet_absgp(bare_format :BareOggFormat) -> bool {
 	}
 }
 
-fn get_format(pck_data :&[u8], bare_format :BareOggFormat,
+fn parse_format(pck_data :&[u8], bare_format :BareOggFormat,
 		last_packet_absgp :Option<u64>) -> Result<OggFormat, OggMetadataError> {
 	use OggFormat::*;
 	Ok(match bare_format {
@@ -257,7 +259,8 @@ pub fn read_format<'a, T :io::Read + io::Seek + 'a>(rdr :&mut T)
 		None
 	};
 
-	res.push(try!(get_format(&pck.data[id_inner.0..], id_inner.1, last_packet_absgp)));
+	res.push(try!(parse_format(&pck.data[id_inner.0..],
+		id_inner.1, last_packet_absgp)));
 
 	if id_inner.1 == BareOggFormat::Skeleton {
 		use std::collections::HashMap;
@@ -329,7 +332,7 @@ pub fn read_format<'a, T :io::Read + io::Seek + 'a>(rdr :&mut T)
 				// This is an invalid format.
 				try!(Err(OggMetadataError::UnrecognizedFormat));
 			}
-			let st = try!(get_format(&(stream.1).data[(stream.0).0..],
+			let st = try!(parse_format(&(stream.1).data[(stream.0).0..],
 				(stream.0).1, Some(pck_cur.absgp_page)));
 			res.push(st);
 		}
