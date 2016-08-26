@@ -5,6 +5,7 @@ authors = ["est31 <MTest31@outlook.com>"]
 description = "Metadata parser for various Ogg codecs"
 license = "MIT/Apache-2.0"
 keywords = ["ogg", "vorbis", "opus", "theora", "speex"]
+documentation = "https://docs.rs/ogg_metadata/0.2.0"
 repository = "https://github.com/est31/ogg-metadata"
 readme = "README.md"
 

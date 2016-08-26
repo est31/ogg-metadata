@@ -2,6 +2,8 @@
 
 Provides utilities to read metadata information for various media formats that use the Ogg container.
 
+[Documentation](https://docs.rs/ogg_metadata/0.2.0).
+
 Supported formats:
 
 * Vorbis (Detection, Metadata)
