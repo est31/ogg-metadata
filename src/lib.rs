@@ -329,7 +329,7 @@ pub fn read_format<'a, T :io::Read + io::Seek + 'a>(rdr :&mut T)
 				Some(v) => v, None => continue };
 
 			if (stream.0).1 == BareOggFormat::Skeleton {
-				// This is an invalid format.
+				// Skeleton inside skeleton is invalid.
 				try!(Err(OggMetadataError::UnrecognizedFormat));
 			}
 			let st = try!(parse_format(&(stream.1).data[(stream.0).0..],
