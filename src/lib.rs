@@ -63,6 +63,8 @@ pub enum OggFormat {
 	/// The skeleton format with structure information
 	/// ([spec](https://wiki.xiph.org/Ogg_Skeleton_4))
 	Skeleton,
+	/// An format not supported by this crate or the magic code was corrupted.
+	Unknown,
 }
 
 /// Bare (C-style enum) counterpart to OggFormat
@@ -246,8 +248,8 @@ pub fn read_format<'a, T :io::Read + io::Seek + 'a>(rdr :&mut T)
 	let pck = try!(pck_rdr.read_packet());
 
 	let id = identify_packet_data_by_magic(&pck.data);
-	let id_inner = match id { Some(v) => v, None =>
-		try!(Err(OggMetadataError::UnrecognizedFormat)) };
+	let id_inner = match id { Some(v) => v,
+		None => return Ok(vec![OggFormat::Unknown]) };
 
 	let mut res = Vec::new();
 
@@ -296,7 +298,10 @@ pub fn read_format<'a, T :io::Read + io::Seek + 'a>(rdr :&mut T)
 				continue;
 			}
 			let id = identify_packet_data_by_magic(&pck_cur.data);
-			let id_inner = match id { Some(v) => v, None => continue };
+			let id_inner = match id { Some(v) => v, None => {
+				res.push(OggFormat::Unknown);
+				continue
+			} };
 			streams.insert(pck_cur.stream_serial, (id_inner, pck_cur));
 		}
 
