@@ -345,3 +345,11 @@ pub fn read_format<'a, T :io::Read + io::Seek + 'a>(rdr :&mut T)
 
 	return Ok(res);
 }
+
+fn format_duration(duration_raw_secs :f64) -> String {
+	let duration_mins = f64::floor(duration_raw_secs / 60.);
+	let duration_secs = f64::floor(duration_raw_secs % 60.);
+	let duration_secs_fractal = (duration_raw_secs % 1.) * 100.;
+	return format!("{:02}:{:02}.{:02.0}",
+		duration_mins, duration_secs, duration_secs_fractal);
+}

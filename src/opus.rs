@@ -40,12 +40,8 @@ impl AudioMetadata for Metadata {
 impl fmt::Debug for Metadata {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		let duration_raw_secs = (self.length_in_48khz_samples as f64) / 48_000.;
-		let duration_mins = f64::floor(duration_raw_secs / 60.);
-		let duration_secs = f64::floor(duration_raw_secs % 60.);
-		let duration_secs_fractal = (duration_raw_secs % 1.) * 100.;
-		write!(f, "{} channels, with duration of {:02}:{:02}.{:02.0}",
-			self.output_channels,
-				duration_mins, duration_secs, duration_secs_fractal)
+		write!(f, "{} channels, with duration of {}",
+			self.output_channels, ::format_duration(duration_raw_secs))
 	}
 }
 
