@@ -79,7 +79,7 @@ enum BareOggFormat {
 
 pub trait AudioMetadata {
 	fn get_output_channel_count(&self) -> u8;
-	fn get_duration(&self) -> Duration;
+	fn get_duration(&self) -> Option<Duration>;
 }
 
 #[derive(Debug)]
@@ -203,15 +203,15 @@ fn parse_format(pck_data :&[u8], bare_format :BareOggFormat,
 			Vorbis(VorbisMetadata {
 				channels : ident_hdr.channels,
 				sample_rate : ident_hdr.sample_rate,
-				length_in_samples : last_packet_absgp.unwrap(),
+				length_in_samples : last_packet_absgp,
 			})
 		},
 		BareOggFormat::Opus => {
 			let ident_hdr = try!(opus::read_header_ident(pck_data));
-			let len = last_packet_absgp.unwrap();
 			Opus(OpusMetadata {
 				output_channels : ident_hdr.output_channels,
-				length_in_48khz_samples : len - (ident_hdr.pre_skip as u64),
+				length_in_48khz_samples : last_packet_absgp.map(
+					|l| l - (ident_hdr.pre_skip as u64)),
 			})
 		},
 		BareOggFormat::Theora => {
@@ -310,35 +310,56 @@ pub fn read_format<'a, T :io::Read + io::Seek + 'a>(rdr :&mut T)
 		// Can this guess be improved??
 		try!(seek_before_end(&mut pck_rdr, 200 * 1024));
 
-		// Now Loop until we have found the
-		// last packets of all the streams,
-		// recording the streams in the process.
-		while !streams.is_empty() {
-			// TODO don't use try! here, but something else
-			// so that we are more tolerant if there is no more
-			// packet to come.
-			// Because we will reach the err case of this
-			// try if we didn't seek early enough, and didn't
-			// catch all end pages of the streams to be
-			// still before us.
-			// As this failure would be our fault due to our
-			// seek distance guess, we should fail gracefully
-			// and just pretend the stream does not exist.
-			let pck_cur = try!(pck_rdr.read_packet());
-
-			// We are only interested in last packets.
-			if !pck_cur.last_packet {
-				continue;
+		'pseudo_return: loop {
+			// This pseudo_try is our local replacement for try,
+			// so that we don't escalate if we encounter any
+			// errors in reading the final absgp positions,
+			// like end of file errors (which may occur with
+			// partial files)
+			macro_rules! pseudo_try {
+				($expr:expr) => (match $expr {
+					$crate::std::result::Result::Ok(val) => val,
+					$crate::std::result::Result::Err(_) => break 'pseudo_return,
+				})
 			}
-			let stream = match streams.remove(&pck_cur.stream_serial) {
-				Some(v) => v, None => continue };
+			// Now Loop until we have found the
+			// last packets of all the streams,
+			// recording the streams in the process.
+			while !streams.is_empty() {
+				// TODO don't use try! here, but something else
+				// so that we are more tolerant if there is no more
+				// packet to come.
+				// Because we will reach the err case of this
+				// try if we didn't seek early enough, and didn't
+				// catch all end pages of the streams to be
+				// still before us.
+				// As this failure would be our fault due to our
+				// seek distance guess, we should fail gracefully
+				// and just pretend the stream does not exist.
+				let pck_cur = pseudo_try!(pck_rdr.read_packet());
 
-			if (stream.0).1 == BareOggFormat::Skeleton {
-				// Skeleton inside skeleton is invalid.
-				try!(Err(OggMetadataError::UnrecognizedFormat));
+				// We are only interested in last packets.
+				if !pck_cur.last_packet {
+					continue;
+				}
+				let stream = match streams.remove(&pck_cur.stream_serial) {
+					Some(v) => v, None => continue };
+
+				if (stream.0).1 == BareOggFormat::Skeleton {
+					// Skeleton inside skeleton is invalid.
+					try!(Err(OggMetadataError::UnrecognizedFormat));
+				}
+				let st = try!(parse_format(&(stream.1).data[(stream.0).0..],
+					(stream.0).1, Some(pck_cur.absgp_page)));
+				res.push(st);
 			}
+			break;
+		}
+
+		// Add all streams we couldn't find a last packet for.
+		for (_,stream) in streams.iter() {
 			let st = try!(parse_format(&(stream.1).data[(stream.0).0..],
-				(stream.0).1, Some(pck_cur.absgp_page)));
+				(stream.0).1, None));
 			res.push(st);
 		}
 	}

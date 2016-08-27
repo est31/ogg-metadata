@@ -19,25 +19,32 @@ Metadata for the Vorbis audio codec.
 pub struct Metadata {
 	pub channels :u8,
 	pub sample_rate :u32,
-	pub length_in_samples :u64,
+	pub length_in_samples :Option<u64>,
 }
 
 impl AudioMetadata for Metadata {
 	fn get_output_channel_count(&self) -> u8 {
 		self.channels
 	}
-	fn get_duration(&self) -> Duration {
-		Duration::from_millis(
-				((self.length_in_samples as f64) / (self.sample_rate as f64) * 1000.0)
+	fn get_duration(&self) -> Option<Duration> {
+		self.length_in_samples.map(|l|
+			Duration::from_millis(
+				((l as f64) / (self.sample_rate as f64) * 1000.0)
 			as u64)
+		)
 	}
 }
 
 impl fmt::Debug for Metadata {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		let duration_raw_secs = (self.length_in_samples as f64) / (self.sample_rate as f64);
-		write!(f, "{} channels, with {} Hz sample rate and duration of {}",
-			self.channels, self.sample_rate, ::format_duration(duration_raw_secs))
+		match self.length_in_samples {
+			Some(l) => {
+				let duration_raw_secs = (l as f64) / (self.sample_rate as f64);
+				write!(f, "{} channels, with {} Hz sample rate and duration of {}",
+					self.channels, self.sample_rate, ::format_duration(duration_raw_secs))
+			},
+			None => write!(f, "{} channels, with {} Hz sample rate", self.channels, self.sample_rate),
+		}
 	}
 }
 

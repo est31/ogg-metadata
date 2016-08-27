@@ -23,25 +23,32 @@ pub struct Metadata {
 	/// While opus has a varying sample rate,
 	/// the per-page sample counter operates on
 	/// units of 48khz.
-	pub length_in_48khz_samples :u64,
+	pub length_in_48khz_samples :Option<u64>,
 }
 
 impl AudioMetadata for Metadata {
 	fn get_output_channel_count(&self) -> u8 {
 		self.output_channels
 	}
-	fn get_duration(&self) -> Duration {
-		Duration::from_millis(
-				((self.length_in_48khz_samples as f64) / 48_000. * 1000.0)
+	fn get_duration(&self) -> Option<Duration> {
+		self.length_in_48khz_samples.map(|l|
+			Duration::from_millis(
+				((l as f64) / 48_000. * 1000.0)
 			as u64)
+		)
 	}
 }
 
 impl fmt::Debug for Metadata {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		let duration_raw_secs = (self.length_in_48khz_samples as f64) / 48_000.;
-		write!(f, "{} channels, with duration of {}",
-			self.output_channels, ::format_duration(duration_raw_secs))
+		match self.length_in_48khz_samples {
+			Some(l) => {
+				let duration_raw_secs = (l as f64) / 48_000.;
+				write!(f, "{} channels, with duration of {}",
+				self.output_channels, ::format_duration(duration_raw_secs))
+			},
+			None => write!(f, "{} channels", self.output_channels),
+		}
 	}
 }
 
