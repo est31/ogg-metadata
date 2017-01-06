@@ -2,7 +2,7 @@
 
 Provides utilities to read metadata information for various media formats that use the Ogg container.
 
-[Documentation](https://docs.rs/ogg_metadata/0.3.0).
+[Documentation](https://docs.rs/ogg_metadata/0.4.0).
 
 Supported formats:
 
