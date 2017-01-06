@@ -242,7 +242,7 @@ fn parse_format(pck_data :&[u8], bare_format :BareOggFormat,
 ///
 /// The approach taken works perfectly with ogg/vorbis and ogg/opus
 /// files, as those only contain one logical bitstream.
-pub fn read_format<'a, T :io::Read + io::Seek + 'a>(rdr :&mut T)
+pub fn read_format<'a, T :io::Read + io::Seek + 'a>(rdr :T)
 		-> Result<Vec<OggFormat>, OggMetadataError> {
 	let mut pck_rdr = PacketReader::new(rdr);
 	let pck = try!(pck_rdr.read_packet());
