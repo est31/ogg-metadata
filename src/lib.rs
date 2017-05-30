@@ -143,10 +143,10 @@ fn get_absgp_of_last_packet<'a, T :io::Read + io::Seek + 'a>(pck_rdr :&mut Packe
 	// valid page inside them (unless there is unused space
 	// between pages, but then there is no guaranteed limit).
 	try!(seek_before_end(pck_rdr, 150 * 1024));
-	let mut pck = try!(pck_rdr.read_packet());
+	let mut pck = try!(pck_rdr.read_packet_expected());
 	// Now read until the last packet, and get its absgp
 	while !pck.last_packet {
-		pck = try!(pck_rdr.read_packet());
+		pck = try!(pck_rdr.read_packet_expected());
 	}
 	return Ok(pck.absgp_page);
 }
@@ -245,7 +245,7 @@ fn parse_format(pck_data :&[u8], bare_format :BareOggFormat,
 pub fn read_format<'a, T :io::Read + io::Seek + 'a>(rdr :T)
 		-> Result<Vec<OggFormat>, OggMetadataError> {
 	let mut pck_rdr = PacketReader::new(rdr);
-	let pck = try!(pck_rdr.read_packet());
+	let pck = try!(pck_rdr.read_packet_expected());
 
 	let id = identify_packet_data_by_magic(&pck.data);
 	let id_inner = match id { Some(v) => v,
@@ -271,7 +271,7 @@ pub fn read_format<'a, T :io::Read + io::Seek + 'a>(rdr :T)
 		// and record any opening streams.
 		let mut streams = HashMap::new();
 		loop {
-			let pck_cur = try!(pck_rdr.read_packet());
+			let pck_cur = try!(pck_rdr.read_packet_expected());
 
 			if pck_cur.stream_serial == pck.stream_serial {
 				/*
@@ -336,7 +336,7 @@ pub fn read_format<'a, T :io::Read + io::Seek + 'a>(rdr :T)
 				// As this failure would be our fault due to our
 				// seek distance guess, we should fail gracefully
 				// and just pretend the stream does not exist.
-				let pck_cur = pseudo_try!(pck_rdr.read_packet());
+				let pck_cur = pseudo_try!(pck_rdr.read_packet_expected());
 
 				// We are only interested in last packets.
 				if !pck_cur.last_packet {
