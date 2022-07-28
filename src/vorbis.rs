@@ -10,8 +10,8 @@ use std::io::Cursor;
 use byteorder::{ReadBytesExt, LittleEndian};
 use std::time::Duration;
 use std::fmt;
-use OggMetadataError;
-use AudioMetadata;
+use crate::OggMetadataError;
+use crate::AudioMetadata;
 
 /**
 Metadata for the Vorbis audio codec.
@@ -41,7 +41,7 @@ impl fmt::Debug for Metadata {
 			Some(l) => {
 				let duration_raw_secs = (l as f64) / (self.sample_rate as f64);
 				write!(f, "{} channels, with {} Hz sample rate and duration of {}",
-					self.channels, self.sample_rate, ::format_duration(duration_raw_secs))
+					self.channels, self.sample_rate, crate::format_duration(duration_raw_secs))
 			},
 			None => write!(f, "{} channels, with {} Hz sample rate", self.channels, self.sample_rate),
 		}
@@ -55,12 +55,12 @@ pub struct IdentHeader {
 
 pub fn read_header_ident(packet :&[u8]) -> Result<IdentHeader, OggMetadataError> {
 	let mut rdr = Cursor::new(packet);
-	let vorbis_version = try!(rdr.read_u32::<LittleEndian>());
+	let vorbis_version = r#try!(rdr.read_u32::<LittleEndian>());
 	if vorbis_version != 0 {
-		try!(Err(OggMetadataError::UnrecognizedFormat));
+		r#try!(Err(OggMetadataError::UnrecognizedFormat));
 	}
-	let audio_channels = try!(rdr.read_u8());
-	let audio_sample_rate = try!(rdr.read_u32::<LittleEndian>());
+	let audio_channels = r#try!(rdr.read_u8());
+	let audio_sample_rate = r#try!(rdr.read_u32::<LittleEndian>());
 
 	let hdr :IdentHeader = IdentHeader {
 		channels : audio_channels,

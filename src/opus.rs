@@ -10,8 +10,8 @@ use std::io::Cursor;
 use byteorder::{ReadBytesExt, LittleEndian};
 use std::fmt;
 use std::time::Duration;
-use OggMetadataError;
-use AudioMetadata;
+use crate::OggMetadataError;
+use crate::AudioMetadata;
 
 /**
 Metadata for the Opus audio codec.
@@ -45,7 +45,7 @@ impl fmt::Debug for Metadata {
 			Some(l) => {
 				let duration_raw_secs = (l as f64) / 48_000.;
 				write!(f, "{} channels, with duration of {}",
-				self.output_channels, ::format_duration(duration_raw_secs))
+				self.output_channels, crate::format_duration(duration_raw_secs))
 			},
 			None => write!(f, "{} channels", self.output_channels),
 		}
@@ -59,15 +59,15 @@ pub struct IdentHeader {
 
 pub fn read_header_ident(packet :&[u8]) -> Result<IdentHeader, OggMetadataError> {
 	let mut rdr = Cursor::new(packet);
-	let opus_version = try!(rdr.read_u8());
+	let opus_version = r#try!(rdr.read_u8());
 	// The version is internally separated into two halves:
 	// The "major" and the "minor" half. We have to be backwards
 	// compatible with any version where the major half is 0.
 	if opus_version >= 16 {
-		try!(Err(OggMetadataError::UnrecognizedFormat));
+		r#try!(Err(OggMetadataError::UnrecognizedFormat));
 	}
-	let output_channels = try!(rdr.read_u8());
-	let pre_skip = try!(rdr.read_u16::<LittleEndian>());
+	let output_channels = r#try!(rdr.read_u8());
+	let pre_skip = r#try!(rdr.read_u16::<LittleEndian>());
 
 	let hdr :IdentHeader = IdentHeader {
 		output_channels : output_channels,

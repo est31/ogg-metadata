@@ -9,7 +9,7 @@
 use std::io::Cursor;
 use byteorder::{ReadBytesExt, BigEndian};
 use std::fmt;
-use OggMetadataError;
+use crate::OggMetadataError;
 
 /**
 Metadata for the Theora video codec.
@@ -34,18 +34,18 @@ pub struct IdentHeader {
 pub fn read_header_ident(packet :&[u8]) -> Result<IdentHeader, OggMetadataError> {
 	let mut rdr = Cursor::new(packet);
 	// Major, minor and revision parts of the version
-	let vmaj = try!(rdr.read_u8());
-	let vmin = try!(rdr.read_u8());
-	let vrev = try!(rdr.read_u8());
+	let vmaj = r#try!(rdr.read_u8());
+	let vmin = r#try!(rdr.read_u8());
+	let vrev = r#try!(rdr.read_u8());
 
 	// Width/height of the frame in macro blocks
-	let fmbw = try!(rdr.read_u16::<BigEndian>());
-	let fmbh = try!(rdr.read_u16::<BigEndian>());
+	let fmbw = r#try!(rdr.read_u16::<BigEndian>());
+	let fmbh = r#try!(rdr.read_u16::<BigEndian>());
 
 	// Width of the picture region in pixels
-	let picw = try!(rdr.read_uint::<BigEndian>(3)) as u32;
+	let picw = r#try!(rdr.read_uint::<BigEndian>(3)) as u32;
 	// Height of the picture region in pixels
-	let pich = try!(rdr.read_uint::<BigEndian>(3)) as u32;
+	let pich = r#try!(rdr.read_uint::<BigEndian>(3)) as u32;
 
 	let hdr :IdentHeader = IdentHeader {
 		picture_region_width : picw,
