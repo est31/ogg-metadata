@@ -34,23 +34,23 @@ pub struct IdentHeader {
 pub fn read_header_ident(packet :&[u8]) -> Result<IdentHeader, OggMetadataError> {
 	let mut rdr = Cursor::new(packet);
 	// Major, minor and revision parts of the version
-	let vmaj = r#try!(rdr.read_u8());
-	let vmin = r#try!(rdr.read_u8());
-	let vrev = r#try!(rdr.read_u8());
+	let vmaj = rdr.read_u8()?;
+	let vmin = rdr.read_u8()?;
+	let vrev = rdr.read_u8()?;
 
 	// Width/height of the frame in macro blocks
-	let fmbw = r#try!(rdr.read_u16::<BigEndian>());
-	let fmbh = r#try!(rdr.read_u16::<BigEndian>());
+	let fmbw = rdr.read_u16::<BigEndian>()?;
+	let fmbh = rdr.read_u16::<BigEndian>()?;
 
 	// Width of the picture region in pixels
-	let picw = r#try!(rdr.read_uint::<BigEndian>(3)) as u32;
+	let picw = rdr.read_uint::<BigEndian>(3)? as u32;
 	// Height of the picture region in pixels
-	let pich = r#try!(rdr.read_uint::<BigEndian>(3)) as u32;
+	let pich = rdr.read_uint::<BigEndian>(3)? as u32;
 
 	let hdr :IdentHeader = IdentHeader {
 		picture_region_width : picw,
 		picture_region_height : pich,
 	};
-	return Ok(hdr);
+	Ok(hdr)
 }
 

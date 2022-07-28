@@ -23,8 +23,8 @@ fn main() {
 fn run() -> Result<(), OggMetadataError> {
 	let file_path = env::args().nth(1).expect("No arg found. Please specify a file to open.");
 	println!("Opening file: {}", file_path);
-	let mut f = r#try!(File::open(file_path));
+	let mut f = File::open(file_path)?;
 	let format = read_format(&mut f);
 	println!("Format of the file is: {:?}", format);
-	return Ok(());
+	Ok(())
 }
