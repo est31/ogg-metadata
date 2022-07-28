@@ -55,16 +55,16 @@ pub struct IdentHeader {
 
 pub fn read_header_ident(packet :&[u8]) -> Result<IdentHeader, OggMetadataError> {
 	let mut rdr = Cursor::new(packet);
-	let vorbis_version = r#try!(rdr.read_u32::<LittleEndian>());
+	let vorbis_version = rdr.read_u32::<LittleEndian>()?;
 	if vorbis_version != 0 {
-		r#try!(Err(OggMetadataError::UnrecognizedFormat));
+		Err(OggMetadataError::UnrecognizedFormat)?;
 	}
-	let audio_channels = r#try!(rdr.read_u8());
-	let audio_sample_rate = r#try!(rdr.read_u32::<LittleEndian>());
+	let audio_channels = rdr.read_u8()?;
+	let audio_sample_rate = rdr.read_u32::<LittleEndian>()?;
 
 	let hdr :IdentHeader = IdentHeader {
 		channels : audio_channels,
 		sample_rate : audio_sample_rate,
 	};
-	return Ok(hdr);
+	Ok(hdr)
 }

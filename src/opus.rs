@@ -59,20 +59,20 @@ pub struct IdentHeader {
 
 pub fn read_header_ident(packet :&[u8]) -> Result<IdentHeader, OggMetadataError> {
 	let mut rdr = Cursor::new(packet);
-	let opus_version = r#try!(rdr.read_u8());
+	let opus_version = rdr.read_u8()?;
 	// The version is internally separated into two halves:
 	// The "major" and the "minor" half. We have to be backwards
 	// compatible with any version where the major half is 0.
 	if opus_version >= 16 {
-		r#try!(Err(OggMetadataError::UnrecognizedFormat));
+		Err(OggMetadataError::UnrecognizedFormat)?
 	}
-	let output_channels = r#try!(rdr.read_u8());
-	let pre_skip = r#try!(rdr.read_u16::<LittleEndian>());
+	let output_channels = rdr.read_u8()?;
+	let pre_skip = rdr.read_u16::<LittleEndian>()?;
 
 	let hdr :IdentHeader = IdentHeader {
-		output_channels : output_channels,
-		pre_skip : pre_skip,
+		output_channels,
+		pre_skip,
 	};
-	return Ok(hdr);
+	Ok(hdr)
 }
 
