@@ -152,10 +152,10 @@ fn get_absgp_of_last_packet<'a, T :io::Read + io::Seek + 'a>(pck_rdr :&mut Packe
 	seek_before_end(pck_rdr, 150 * 1024)?;
 	let mut pck = pck_rdr.read_packet_expected()?;
 	// Now read until the last packet, and get its absgp
-	while !pck.last_packet {
+	while !pck.last_in_stream() {
 		pck = pck_rdr.read_packet_expected()?;
 	}
-	Ok(pck.absgp_page)
+	Ok(pck.absgp_page())
 }
 
 fn identify_packet_data_by_magic(pck_data :&[u8]) -> Option<(usize, BareOggFormat)> {
@@ -280,7 +280,7 @@ pub fn read_format<'a, T :io::Read + io::Seek + 'a>(rdr :T)
 		loop {
 			let pck_cur = pck_rdr.read_packet_expected()?;
 
-			if pck_cur.stream_serial == pck.stream_serial {
+			if pck_cur.stream_serial() == pck.stream_serial() {
 				/*
 				// "fisbone\0"
 				let fisbone_magic = [0x66, 0x69, 0x73, 0x62, 0x6f, 0x6e, 0x65, 0x00];
@@ -296,12 +296,12 @@ pub fn read_format<'a, T :io::Read + io::Seek + 'a>(rdr :T)
 					_ => {},
 				}
 				*/
-				if pck_cur.last_packet {
+				if pck_cur.last_in_stream() {
 					break;
 				}
 			}
 
-			if !pck_cur.first_packet {
+			if !pck_cur.first_in_stream() {
 				continue;
 			}
 			let id = identify_packet_data_by_magic(&pck_cur.data);
@@ -309,7 +309,7 @@ pub fn read_format<'a, T :io::Read + io::Seek + 'a>(rdr :T)
 				res.push(OggFormat::Unknown);
 				continue
 			} };
-			streams.insert(pck_cur.stream_serial, (id_inner, pck_cur));
+			streams.insert(pck_cur.stream_serial(), (id_inner, pck_cur));
 		}
 
 		// Now seek to right before the end to get the last packets of the content.
@@ -349,10 +349,10 @@ pub fn read_format<'a, T :io::Read + io::Seek + 'a>(rdr :T)
 				let pck_cur = pseudo_try!(pck_rdr.read_packet_expected());
 
 				// We are only interested in last packets.
-				if !pck_cur.last_packet {
+				if !pck_cur.last_in_stream() {
 					continue;
 				}
-				let stream = match streams.remove(&pck_cur.stream_serial) {
+				let stream = match streams.remove(&pck_cur.stream_serial()) {
 					Some(v) => v, None => continue };
 
 				if (stream.0).1 == BareOggFormat::Skeleton {
@@ -360,7 +360,7 @@ pub fn read_format<'a, T :io::Read + io::Seek + 'a>(rdr :T)
 					Err(OggMetadataError::UnrecognizedFormat)?;
 				}
 				let st = parse_format(&(stream.1).data[(stream.0).0..],
-					(stream.0).1, Some(pck_cur.absgp_page))?;
+					(stream.0).1, Some(pck_cur.absgp_page()))?;
 				res.push(st);
 			}
 			break;
