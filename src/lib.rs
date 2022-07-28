@@ -319,7 +319,7 @@ pub fn read_format<'a, T :io::Read + io::Seek + 'a>(rdr :T)
 
 		// We have to look into how to fix this, but it isn't of
 		// immediate importance.
-		#[warn(clippy::never_loop)]
+		#[allow(clippy::never_loop)]
 		'pseudo_return: loop {
 			// This pseudo_try is our local replacement for try,
 			// so that we don't escalate if we encounter any
